@@ -40,14 +40,14 @@
 -spec get_listener(nkpacket:nkport()) ->
     supervisor:child_spec().
 
-get_listener(#nkport{listen_ip=Ip, listen_port=Port, transp=Transp}=NkPort) 
+get_listener(#nkport{listen_ip=Ip, listen_port=Port, transp=Transp}=NkPort)
         when Transp==tcp; Transp==tls ->
     {
         {{Transp, Ip, Port}, make_ref()},
         {?MODULE, start_link, [NkPort]},
-        transient, 
-        5000, 
-        worker, 
+        transient,
+        5000,
+        worker,
         [?MODULE]
     }.
 
@@ -55,11 +55,11 @@ get_listener(#nkport{listen_ip=Ip, listen_port=Port, transp=Transp}=NkPort)
 %% @private Starts a new connection to a remote server
 -spec connect(nkpacket:nkport()) ->
     {ok, nkpacket:nkport()} | {error, term()}.
-         
+
 connect(NkPort) ->
     #nkport{
-        transp = Transp, 
-        remote_ip = Ip, 
+        transp = Transp,
+        remote_ip = Ip,
         remote_port = Port,
         meta = Meta
     } = NkPort,
@@ -71,7 +71,7 @@ connect(NkPort) ->
     end,
     lager:debug("TCP connect to: ~p:~p:~p (~p)", [Transp, Ip, Port, SocketOpts]),
     case TranspMod:connect(Ip, Port, SocketOpts, ConnTimeout) of
-        {ok, Socket} -> 
+        {ok, Socket} ->
             {ok, {LocalIp, LocalPort}} = InetMod:sockname(Socket),
             NkPort1 = NkPort#nkport{
                 local_ip = LocalIp,
@@ -80,7 +80,7 @@ connect(NkPort) ->
             },
             InetMod:setopts(Socket, [{active, once}]),
             {ok, NkPort1};
-        {error, Error} -> 
+        {error, Error} ->
             {error, Error}
     end.
 
@@ -105,7 +105,7 @@ start_link(NkPort) ->
 }).
 
 
-%% @private 
+%% @private
 -spec init(term()) ->
     {ok, #state{}} | {stop, term()}.
 
@@ -113,8 +113,8 @@ init([NkPort]) ->
     #nkport{
         class = Class,
         protocol = Protocol,
-        transp = Transp, 
-        listen_ip = ListenIp, 
+        transp = Transp,
+        listen_ip = ListenIp,
         listen_port = ListenPort,
         meta = Meta
     } = NkPort,
@@ -128,7 +128,7 @@ init([NkPort]) ->
             true = register(Id, self()),
             NkPort1 = NkPort#nkport{
                 local_ip = LocalIp,
-                local_port = LocalPort, 
+                local_port = LocalPort,
                 listen_ip = ListenIp,
                 listen_port = LocalPort,
                 pid = self(),
@@ -138,12 +138,11 @@ init([NkPort]) ->
             RanchPort = NkPort1#nkport{meta=maps:with(?CONN_LISTEN_OPTS, Meta)},
             {ok, RanchPid} = ranch_listener_sup:start_link(
                 RanchId,
-                maps:get(tcp_listeners, Meta, 100),
                 RanchMod,
-                [
-                    {socket, Socket}, 
-                    {max_connections,  maps:get(tcp_max_connections, Meta, 1024)}
-                ],
+                #{socket => Socket,
+                  num_acceptors => maps:get(tcp_listeners, Meta, 100),
+                  max_connections => maps:get(tcp_max_connections, Meta, 1024)
+                },
                 ?MODULE,
                 [RanchPort]),
             nklib_proc:put(nkpacket_listeners, {Id, Class}),
@@ -171,7 +170,7 @@ init([NkPort]) ->
             },
             {ok, State};
         {error, Error} ->
-            lager:error("could not start ~p transport on ~p:~p (~p)", 
+            lager:error("could not start ~p transport on ~p:~p (~p)",
                    [Transp, ListenIp, ListenPort, Error]),
             {stop, Error}
     end.
@@ -179,7 +178,7 @@ init([NkPort]) ->
 
 %% @private
 -spec handle_call(term(), {pid(), term()}, #state{}) ->
-    {reply, term(), #state{}} | {noreply, term(), #state{}} | 
+    {reply, term(), #state{}} | {noreply, term(), #state{}} |
     {stop, term(), #state{}} | {stop, term(), term(), #state{}}.
 
 handle_call({nkpacket_apply_nkport, Fun}, _From, #state{nkport=NkPort}=State) ->
@@ -240,7 +239,7 @@ code_change(_OldVsn, State, _Extra) ->
 -spec terminate(term(), #state{}) ->
     ok.
 
-terminate(Reason, State) ->  
+terminate(Reason, State) ->
     #state{
         ranch_id = RanchId,
         ranch_pid = RanchPid,
