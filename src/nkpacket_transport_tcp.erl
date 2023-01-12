@@ -27,7 +27,7 @@
 -export([get_listener/1, connect/1, start_link/1]).
 -export([init/1, terminate/2, code_change/3, handle_call/3, handle_cast/2,
          handle_info/2]).
--export([start_link/4]).
+-export([start_link/3]).
 
 -include("nkpacket.hrl").
 
@@ -110,71 +110,45 @@ start_link(NkPort) ->
     {ok, #state{}} | {stop, term()}.
 
 init([NkPort]) ->
-    #nkport{
-        class = Class,
-        protocol = Protocol,
-        transp = Transp,
-        listen_ip = ListenIp,
-        listen_port = ListenPort,
-        meta = Meta
-    } = NkPort,
-    process_flag(trap_exit, true),   %% Allow calls to terminate
-    ListenOpts = listen_opts(NkPort),
-    case nkpacket_transport:open_port(NkPort, ListenOpts) of
-        {ok, Socket}  ->
-            {InetMod, _, RanchMod} = get_modules(Transp),
-            {ok, {LocalIp, LocalPort}} = InetMod:sockname(Socket),
-            Id = binary_to_atom(nklib_util:hash({tcp, LocalIp, LocalPort}), latin1),
-            true = register(Id, self()),
-            NkPort1 = NkPort#nkport{
-                local_ip = LocalIp,
-                local_port = LocalPort,
-                listen_ip = ListenIp,
-                listen_port = LocalPort,
-                pid = self(),
-                socket = Socket
-            },
-            RanchId = {Transp, ListenIp, LocalPort},
-            RanchPort = NkPort1#nkport{meta=maps:with(?CONN_LISTEN_OPTS, Meta)},
-            {ok, RanchPid} = ranch_listener_sup:start_link(
-                RanchId,
-                RanchMod,
-                #{socket => Socket,
-                  num_acceptors => maps:get(tcp_listeners, Meta, 100),
-                  max_connections => maps:get(tcp_max_connections, Meta, 1024)
-                },
-                ?MODULE,
-                [RanchPort]),
-            nklib_proc:put(nkpacket_listeners, {Id, Class}),
-            ConnMetaOpts = [tcp_packet | ?CONN_LISTEN_OPTS],
-            % ConnMetaOpts = [tcp_packet, tls_opts | ?CONN_LISTEN_OPTS],
-            ConnMeta = maps:with(ConnMetaOpts, Meta),
-            ConnPort = NkPort1#nkport{meta=ConnMeta},
-            ListenType = case size(ListenIp) of
-                4 -> nkpacket_listen4;
-                8 -> nkpacket_listen6
-            end,
-            nklib_proc:put({ListenType, Class, Protocol, Transp}, ConnPort),
-            {ok, ProtoState} = nkpacket_util:init_protocol(Protocol, listen_init, NkPort1),
-            MonRef = case Meta of
-                #{monitor:=UserRef} -> erlang:monitor(process, UserRef);
-                _ -> undefined
-            end,
-            State = #state{
-                nkport = ConnPort,
-                ranch_id = RanchId,
-                ranch_pid = RanchPid,
-                protocol = Protocol,
-                proto_state = ProtoState,
-                monitor_ref = MonRef
-            },
-            {ok, State};
-        {error, Error} ->
-            lager:error("could not start ~p transport on ~p:~p (~p)",
-                   [Transp, ListenIp, ListenPort, Error]),
-            {stop, Error}
-    end.
-
+    #nkport{class = Class,
+            protocol = Protocol,
+            transp = Transp,
+            listen_ip = ListenIp,
+            listen_port = ListenPort,
+            meta = Meta} = NkPort,
+    process_flag(trap_exit, true),
+    {_InetMod, _, RanchMod} = get_modules(Transp),
+    Id = binary_to_atom(nklib_util:hash({tcp, ListenIp, ListenPort})),
+    true = register(Id, self()),
+    NkPort1 = NkPort#nkport{pid = self()},
+    RanchId = {ListenPort, ListenIp, Transp},
+    RanchPort = NkPort1#nkport{meta=maps:with(?CONN_LISTEN_OPTS, Meta)},
+    TransportOpts = #{socket_opts => listen_opts(NkPort),
+                      num_acceptors => maps:get(tcp_listeners, Meta, 100),
+                      max_connections => maps:get(tcp_max_connections, Meta, 1024)},
+    {ok, RanchPid} = ranch_listener_sup:start_link(RanchId, RanchMod, TransportOpts,
+                                                   ?MODULE, RanchPort),
+    nklib_proc:put(nkpacket_listeners, {Id, Class}),
+    ConnMetaOpts = [tcp_packet | ?CONN_LISTEN_OPTS],
+    ConnMeta = maps:with(ConnMetaOpts, Meta),
+    ConnPort = NkPort1#nkport{meta=ConnMeta},
+    ListenType = case size(ListenIp) of
+                     4 -> nkpacket_listen4;
+                     8 -> nkpacket_listen6
+                 end,
+    nklib_proc:put({ListenType, Class, Protocol, Transp}, ConnPort),
+    {ok, ProtoState} = nkpacket_util:init_protocol(Protocol, listen_init, NkPort1),
+    MonRef = case Meta of
+                 #{monitor:=UserRef} -> erlang:monitor(process, UserRef);
+                 _ -> undefined
+             end,
+    State = #state{nkport = ConnPort,
+                   ranch_id = RanchId,
+                   ranch_pid = RanchPid,
+                   protocol = Protocol,
+                   proto_state = ProtoState,
+                   monitor_ref = MonRef},
+    {ok, State}.
 
 %% @private
 -spec handle_call(term(), {pid(), term()}, #state{}) ->
@@ -262,30 +236,11 @@ terminate(Reason, State) ->
 
 %% @private Ranch's callback, called for every new inbound connection
 %% to create a new process to manage it
--spec start_link(term(), term(), atom(), term()) ->
+-spec start_link(term(), atom(), term()) ->
     {ok, pid()}.
 
-start_link(Ref, Socket, TranspModule, [#nkport{meta=Meta}=NkPort]) ->
-    {ok, {LocalIp, LocalPort}} = TranspModule:sockname(Socket),
-    {ok, {RemoteIp, RemotePort}} = TranspModule:peername(Socket),
-    NkPort1 = NkPort#nkport{
-        local_ip = LocalIp,
-        local_port = LocalPort,
-        remote_ip = RemoteIp,
-        remote_port = RemotePort,
-        socket = Socket
-    },
-    case TranspModule of
-        ranch_ssl ->
-            ok;
-        ranch_tcp ->
-            Opts = lists:flatten([
-                case Meta of #{tcp_packet:=Packet} -> {packet, Packet}; _ -> [] end,
-                {keepalive, true}, {active, once}
-            ]),
-            TranspModule:setopts(Socket, Opts)
-    end,
-    nkpacket_connection:ranch_start_link(NkPort1, Ref).
+start_link(Ref, TranspModule, NkPort) ->
+    nkpacket_connection:ranch_start_link(Ref, TranspModule, NkPort).
 
 
 %% ===================================================================
@@ -315,23 +270,13 @@ outbound_opts(#nkport{transp=tls, meta=Opts}) ->
 -spec listen_opts(#nkport{}) ->
     list().
 
-listen_opts(#nkport{transp=tcp, listen_ip=Ip, meta=Opts}) ->
-    [
-        {packet, case Opts of #{tcp_packet:=Packet} -> Packet; _ -> raw end},
-        {ip, Ip}, {active, false}, binary,
-        {nodelay, true}, {keepalive, true},
-        {reuseaddr, true}, {backlog, 1024}
-    ];
+listen_opts(#nkport{transp = tcp} = NkPort) ->
+    basic_listen_opts(NkPort);
+listen_opts(#nkport{transp = tls, meta = Opts} = NkPort) ->
+    basic_listen_opts(NkPort) ++ nkpacket_util:make_tls_opts(Opts).
 
-listen_opts(#nkport{transp=tls, listen_ip=Ip, meta=Opts}) ->
-    [
-        {packet, case Opts of #{tcp_packet:=Packet} -> Packet; _ -> raw end},
-        {ip, Ip}, {active, once}, binary,
-        {nodelay, true}, {keepalive, true},
-        {reuseaddr, true}, {backlog, 1024}
-    ]
-    ++ nkpacket_util:make_tls_opts(Opts).
-
+basic_listen_opts(#nkport{listen_ip=Ip, listen_port=ListenPort}) ->
+    [{port, ListenPort}, {ip, Ip}, {nodelay, true}, {keepalive, true}, {backlog, 1024}].
 
 %% @private
 call_protocol(Fun, Args, State) ->

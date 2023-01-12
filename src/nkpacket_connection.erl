@@ -27,7 +27,7 @@
 -export([reset_timeout/2, get_timeout/1, update_monitor/2]).
 -export([get_all/0, get_all/1, get_all_class/0, stop_all/0, stop_all/1]).
 -export([incoming/2, connect/1, conn_init/1]).
--export([ranch_start_link/2, ranch_init/2]).
+-export([ranch_start_link/3, ranch_init/3]).
 -export([start_link/1, init/1, terminate/2, code_change/3, handle_call/3,   
             handle_cast/2, handle_info/2]).
 
@@ -247,9 +247,9 @@ start_link(NkPort) ->
     gen_server:start_link(?MODULE, [NkPort], []).
 
 
-%% @private Ranch's entry point (see nkpacket_transport_tcp:start_link/4)
-ranch_start_link(NkPort, Ref) ->
-    proc_lib:start_link(?MODULE, ranch_init, [NkPort, Ref]).
+%% @private Ranch's entry point (see nkpacket_transport_tcp:start_link/3)
+ranch_start_link(Ref, TranspModule, NkPort) ->
+    proc_lib:start_link(?MODULE, ranch_init, [Ref, TranspModule, NkPort]).
 
 
 %% ===================================================================
@@ -357,7 +357,7 @@ init([NkPort]) ->
     State = #state{
         transp = Transp,
         nkport = StoredNkPort,
-        socket = Socket, 
+        socket = Socket,
         listen_monitor = ListenMonitor,
         srv_monitor = SrvMonitor,
         user_monitor = UserMonitor,
@@ -384,12 +384,32 @@ init([NkPort]) ->
 
 
 %% @private
-ranch_init(NkPort, Ref) ->
+ranch_init(Ref, TranspModule, NkPort) ->
     ok = proc_lib:init_ack({ok, self()}),
-    ok = ranch:accept_ack(Ref),
-    {ok, State} = init([NkPort]),
+    {ok, Socket} = ranch:handshake(Ref),
+    {ok, {LocalIp, LocalPort}} = TranspModule:sockname(Socket),
+    {ok, {RemoteIp, RemotePort}} = TranspModule:peername(Socket),
+    NkPort1 = NkPort#nkport{
+        local_ip = LocalIp,
+        local_port = LocalPort,
+        remote_ip = RemoteIp,
+        remote_port = RemotePort,
+        socket = Socket
+    },
+    set_ranch_opts(TranspModule, NkPort1),
+    {ok, State} = init([NkPort1]),
     gen_server:enter_loop(?MODULE, [], State).
 
+set_ranch_opts(ranch_ssl, _) ->
+    ok;
+set_ranch_opts(ranch_tcp, #nkport{meta = Meta, socket = Socket}) ->
+    Opts = [{keepalive, true}, {active, once}] ++ ranch_packet_opts(Meta),
+    ranch_tcp:setopts(Socket, Opts).
+
+ranch_packet_opts(#{tcp_packet := Packet}) ->
+    [{packet, Packet}];
+ranch_packet_opts(#{}) ->
+    [].
 
 %% @private
 conn_init(#nkport{transp=Transp}=NkPort) when Transp==tcp; Transp==tls ->
