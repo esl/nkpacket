@@ -57,6 +57,6 @@ cleanplt:
 
 
 build_tests:
-	erlc -pa ebin -pa deps/lager/ebin -pa deps/nklib/ebin -o ebin -I include \
-	+export_all +debug_info +"{parse_transform, lager_transform}" \
+	erlc -pa ebin -pa deps/nklib/ebin -o ebin -I include \
+	+export_all +debug_info \
 	test/*.erl
