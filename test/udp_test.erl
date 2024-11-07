@@ -53,7 +53,7 @@ basic() ->
 	{ok, {_, udp, {0,0,0,0}, Port1}} = nkpacket:get_local(UdpP1),
 	case Port1 of
 		1234 -> ok;
-		_ -> lager:warning("Could not open port 1234")
+		_ -> logger:warning("Could not open port 1234")
 	end,
 	[Listen1] = nkpacket:get_all(),
 	[Listen1] = nkpacket:get_all(none),
@@ -80,7 +80,7 @@ basic() ->
 		#nkport{transp=udp, local_port=Port2, pid=LisA}
 	] = test_util:listeners(dom2),
 
-	lager:warning("Some processes will be killed now..."),
+	logger:warning("Some processes will be killed now..."),
 	% Should also work with kill
 	% exit(ConnA, kill),
 	exit(ConnA, forced_stop),
