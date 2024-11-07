@@ -33,7 +33,7 @@
 
 -define(
     DO_LOG(Level, Domain, Text, Opts),
-        lager:Level([{domain, Domain}], "~p "++Text, [Domain|Opts])).
+        logger:Level("~p "++Text, [Domain|Opts])).
 
 -define(debug(Domain, Text, List), 
     ?DO_LOG(debug, Domain, Text, List)).

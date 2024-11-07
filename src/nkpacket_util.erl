@@ -84,8 +84,7 @@ print_all([Id|Rest]) ->
         NkPort#nkport{socket=element(1,Socket)}; 
         false -> NkPort
     end,
-    {_, _, List} = lager:pr(NkPort1, ?MODULE),
-    io:format("~p\n", [List]),
+    io:format("~p\n", [NkPort1]),
     print_all(Rest).
 
 
@@ -305,7 +304,7 @@ init_protocol(Protocol, Fun, Arg) ->
             catch
                 Class:Reason ->
                     Stacktrace = erlang:get_stacktrace(),
-                    lager:error("Exception ~p (~p) calling ~p:~p(~p). Stack: ~p", 
+                    logger:error("Exception ~p (~p) calling ~p:~p(~p). Stack: ~p", 
                                 [Class, Reason, Protocol, Fun, Arg, Stacktrace]),
                     erlang:Class([{reason, Reason}, {stacktrace, Stacktrace}])
             end
@@ -327,7 +326,7 @@ call_protocol(Fun, Args, State, Pos) ->
         false when Fun==conn_handle_call; Fun==conn_handle_cast; 
                    Fun==conn_handle_info; Fun==listen_handle_call; 
                    Fun==listen_handle_cast; Fun==listen_handle_info ->
-            lager:error("Module ~p received unexpected ~p: ~p", [?MODULE, Fun, Args]),
+            logger:error("Module ~p received unexpected ~p: ~p", [?MODULE, Fun, Args]),
             undefined;
         false ->
             undefined;
@@ -344,7 +343,7 @@ call_protocol(Fun, Args, State, Pos) ->
             catch
                 EClass:Reason ->
                     Stacktrace = erlang:get_stacktrace(),
-                    lager:error("Exception ~p (~p) calling ~p:~p(~p). Stack: ~p", 
+                    logger:error("Exception ~p (~p) calling ~p:~p(~p). Stack: ~p", 
                                 [EClass, Reason, Protocol, Fun, Args, Stacktrace]),
                     erlang:EClass([{reason, Reason}, {stacktrace, Stacktrace}])
             end
