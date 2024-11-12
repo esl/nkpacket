@@ -76,7 +76,7 @@ basic() ->
 	{ok, {_, _, _, ListenPort2}} = nkpacket:get_local(Tcp2),
 	case ListenPort1 of
 		1235 -> ok;
-		_ -> lager:warning("Could not open port 1235")
+		_ -> logger:warning("Could not open port 1235")
 	end,
 
 	Uri = "<test://localhost:"++integer_to_list(ListenPort1)++";transport=tcp>",
@@ -129,7 +129,7 @@ tls() ->
 	{ok, {_, _, _, ListenPort1}} = nkpacket:get_local(Tls1),
 	case ListenPort1 of
 		1236 -> ok;
-		_ -> lager:warning("Could not open port 1236")
+		_ -> logger:warning("Could not open port 1236")
 	end,
 	receive {Ref1, listen_init} -> ok after 1000 -> error(?LINE) end,
 	timer:sleep(1000),
@@ -211,7 +211,7 @@ send() ->
 	{ok, {_, udp, _, Listen2}} = nkpacket:get_local(Udp2),
 
 	% Invalid sends
-	lager:warning("Next warning about a invalid send specification is expected"),
+	logger:warning("Next warning about a invalid send specification is expected"),
 	{error, {invalid_send_specification, wrong}} = nkpacket:send(wrong, msg1),
 	{error, no_transports} =
 		nkpacket:send({current, {test_protocol, tcp, {0,0,0,0}, Listen2}}, msg1),

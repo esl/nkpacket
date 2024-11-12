@@ -247,7 +247,7 @@ init([NkPort, Filter]) ->
             },
             {ok, register(State)};
         {error, Error} ->
-            lager:error("could not start ~p transport on ~p:~p (~p)", 
+            logger:error("could not start ~p transport on ~p:~p (~p)", 
                    [Transp, ListenIp, ListenPort, Error]),
             {stop, Error}
     end.
@@ -275,7 +275,7 @@ handle_call(get_state, _From, State) ->
     {reply, State, State};
 
 handle_call(Msg, _From, State) ->
-    lager:error("Module ~p received unexpected call: ~p", [?MODULE, Msg]),
+    logger:error("Module ~p received unexpected call: ~p", [?MODULE, Msg]),
     {noreply, State}.
 
 
@@ -284,7 +284,7 @@ handle_call(Msg, _From, State) ->
     {noreply, #state{}} | {stop, term(), #state{}}.
 
 handle_cast(Msg, State) ->
-    lager:error("Module ~p received unexpected cast: ~p", [?MODULE, Msg]),
+    logger:error("Module ~p received unexpected cast: ~p", [?MODULE, Msg]),
     {noreply, State}.
 
 
@@ -296,13 +296,13 @@ handle_info({'DOWN', MRef, process, _Pid, _Reason}=Msg, State) ->
     #state{filters=Filters} = State,
     case lists:keytake(MRef, #filter.mon, Filters) of
         {value, _, []} ->
-            % lager:debug("Last server leave"),
+            % logger:debug("Last server leave"),
             {stop, normal, State};
         {value, _, Filters1} ->
-            % lager:debug("Server leave"),
+            % logger:debug("Server leave"),
             {noreply, register(State#state{filters=Filters1})};
         false ->
-            lager:warning("Module ~p received unexpected info: ~p", [?MODULE, Msg]),
+            logger:warning("Module ~p received unexpected info: ~p", [?MODULE, Msg]),
             {noreply, State}
     end;
 
@@ -310,7 +310,7 @@ handle_info({'EXIT', Pid, Reason}, #state{ranch_pid=Pid}=State) ->
     {stop, {ranch_stop, Reason}, State};
 
 handle_info(Msg, State) ->
-    lager:warning("Module ~p received unexpected info: ~p", [?MODULE, Msg]),
+    logger:warning("Module ~p received unexpected info: ~p", [?MODULE, Msg]),
     {noreply, State}.
 
 
@@ -327,7 +327,7 @@ code_change(_OldVsn, State, _Extra) ->
     ok.
 
 terminate(Reason, #state{ranch_pid=RanchPid}=State) ->  
-    lager:debug("Cowboy listener stop: ~p", [Reason]),
+    logger:debug("Cowboy listener stop: ~p", [Reason]),
     #state{
         ranch_id = RanchId,
         nkport = #nkport{transp=Transp, socket=Socket}
@@ -366,14 +366,14 @@ start_link(Ref, Socket, TranspModule, Opts) ->
 % start_cowboy_wait(Pid) ->
 %     receive
 %         {'EXIT', Pid, Reason} ->
-%             lager:warning("COWBOY EXIT: ~p", [Reason]);
+%             logger:warning("COWBOY EXIT: ~p", [Reason]);
 %         Other ->
-%             lager:warning("OTHER: ~p", [Other]),
+%             logger:warning("OTHER: ~p", [Other]),
 %             Pid ! Other,
 %             start_cowboy_wait(Pid)
 %     after 
 %         30000 ->
-%             lager:warning("COWBOY EXIT!!")
+%             logger:warning("COWBOY EXIT!!")
 %     end.
 
 
@@ -393,7 +393,7 @@ execute(Req, Env) ->
     term().
 
 execute([], Req, _Env) ->
-    lager:info("NkPACKET Cowboy: url ~s not matched", [cowboy_req:path(Req)]),
+    logger:info("NkPACKET Cowboy: url ~s not matched", [cowboy_req:path(Req)]),
     {stop, reply(404, Req)};
 
 execute([Filter|Rest], Req, Env) ->
@@ -429,7 +429,7 @@ execute([Filter|Rest], Req, Env) ->
         check_paths(ReqPaths, Paths)
     of
         true ->
-            lager:debug("NkPACKET Web Selected: ~p (~p) ~p (~p), ~p (~p), ~p (~p)", 
+            logger:debug("NkPACKET Web Selected: ~p (~p) ~p (~p), ~p (~p), ~p (~p)", 
                 [ReqType, Type, ReqHost, Host, ReqPaths, Paths, ReqWsProto, WsProto]),
             Req1 = case WsProto of
                 any -> 
@@ -445,7 +445,7 @@ execute([Filter|Rest], Req, Env) ->
                     Result
             end;
         false ->
-            lager:debug("NkPACKET Web Skipping: ~p (~p) ~p (~p), ~p (~p), ~p (~p)", 
+            logger:debug("NkPACKET Web Skipping: ~p (~p) ~p (~p), ~p (~p), ~p (~p)", 
                 [ReqType, Type, ReqHost, Host, ReqPaths, Paths, ReqWsProto, WsProto]),
             execute(Rest, Req, Env)
     end.

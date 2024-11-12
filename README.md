@@ -128,7 +128,7 @@ ext_ip, if auto, is obtained using STUN.
 None of them are used by nkpacket itself, but are available for client projects.
 
 
-NkPACKET uses [lager](https://github.com/basho/lager) for log management. 
+NkPACKET uses [logger](https://github.com/basho/logger) for log management.
 
 NkPACKET needs Erlang >= 17 and it is tested on Linux and OSX.
 

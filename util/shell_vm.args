@@ -1,4 +1,3 @@
--pa deps/lager/ebin
 -pa deps/goldrush/ebin
 -pa deps/jsx/ebin
 -pa deps/jiffy/ebin

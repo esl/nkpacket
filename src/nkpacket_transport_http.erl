@@ -140,7 +140,7 @@ init([NkPort]) ->
         {ok, State}
     catch
         throw:TError -> 
-            lager:error("could not start ~p transport on ~p:~p (~p)", 
+            logger:error("could not start ~p transport on ~p:~p (~p)", 
                    [Transp, Ip, Port, TError]),
         {stop, TError}
     end.
@@ -170,16 +170,16 @@ handle_call({nkpacket_start, Ip, Port, _UserMeta, Pid}, _From, State) ->
             % the cowboy process (using 'socket')
             case nkpacket_connection:start(NkPort1) of
                 {ok, #nkport{pid=ConnPid}=NkPort2} ->
-                    lager:debug("HTTP listener accepted connection: ~p", 
+                    logger:debug("HTTP listener accepted connection: ~p", 
                           [NkPort2]),
                     {reply, {ok, Protocol, HttpProto, ConnPid}, State};
                 {error, Error} ->
-                    lager:notice("HTTP listener did not accepted connection:"
+                    logger:notice("HTTP listener did not accepted connection:"
                             " ~p", [Error]),
                     {reply, next, State}
             end;
         false ->
-            lager:notice("HTTP protocol ~p missing", [Protocol]),
+            logger:notice("HTTP protocol ~p missing", [Protocol]),
             {reply, next, State}
     end;
 
@@ -217,7 +217,7 @@ handle_info({'DOWN', MRef, process, _Pid, _Reason}, #state{monitor_ref=MRef}=Sta
     {stop, normal, State};
 
 handle_info({'DOWN', _MRef, process, Pid, Reason}, #state{shared=Pid}=State) ->
-    % lager:warning("WS received SHARED stop"),
+    % logger:warning("WS received SHARED stop"),
     {stop, Reason, State};
 
 handle_info(Msg, #state{nkport=NkPort}=State) ->

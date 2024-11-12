@@ -10,7 +10,6 @@
         crypto,
         sasl,
         ssl,
-        lager,
         ssh,
         ranch,
         cowlib,

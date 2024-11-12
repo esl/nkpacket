@@ -61,15 +61,15 @@ start(_Type, _Args) ->
             nkpacket_util:make_cache(),
             {ok, Pid} = nkpacket_sup:start_link(),
             {ok, Vsn} = application:get_key(nkpacket, vsn),
-            lager:info("NkPACKET v~s has started.", [Vsn]),
+            logger:info("NkPACKET v~s has started.", [Vsn]),
             MainIp = nklib_util:to_host(nkpacket_app:get(main_ip)),
             MainIp6 = nklib_util:to_host(nkpacket_app:get(main_ip6)),
             ExtIp = nklib_util:to_host(nkpacket_app:get(ext_ip)),
-            lager:info("Main IP is ~s (~s). External IP is ~s", 
+            logger:info("Main IP is ~s (~s). External IP is ~s", 
                        [MainIp, MainIp6, ExtIp]),
             {ok, Pid};
         {error, Error} ->
-            lager:error("Config error: ~p", [Error]),
+            logger:error("Config error: ~p", [Error]),
             error(config_error)
     end.
 

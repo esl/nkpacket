@@ -172,7 +172,7 @@ init([NkPort]) ->
             _ -> 
                 undefined
         end,
-        lager:info("Created ~p listener for ~p:~p:~p (~p, ~p, ~p) (~p)", 
+        logger:info("Created ~p listener for ~p:~p:~p (~p, ~p, ~p) (~p)", 
                    [Protocol, Transp, LocalIp, LocalPort, 
                     Host, Path, WsProto, self()]),
         State = #state{
@@ -185,7 +185,7 @@ init([NkPort]) ->
         {ok, State}
     catch
         throw:TError -> 
-            lager:error("could not start ~p transport on ~p:~p (~p)", 
+            logger:error("could not start ~p transport on ~p:~p (~p)", 
                    [Transp, ListenIp, ListenPort, TError]),
         {stop, TError}
     end.
@@ -218,11 +218,11 @@ handle_call({nkpacket_start, Ip, Port, UserMeta, Pid}, _From, State) ->
     },
     case nkpacket_connection:start(NkPort1) of
         {ok, #nkport{pid=ConnPid}=NkPort2} ->
-            lager:debug("WS listener accepted connection: ~p", 
+            logger:debug("WS listener accepted connection: ~p", 
                   [NkPort2]),
             {reply, {ok, ConnPid}, State};
         {error, Error} ->
-            lager:notice("WS listener did not accepted connection:"
+            logger:notice("WS listener did not accepted connection:"
                     " ~p", [Error]),
             {reply, next, State}
     end;
@@ -261,7 +261,7 @@ handle_info({'DOWN', MRef, process, _Pid, _Reason}, #state{monitor_ref=MRef}=Sta
     {stop, normal, State};
 
 handle_info({'DOWN', _MRef, process, Pid, Reason}, #state{shared=Pid}=State) ->
-    % lager:warning("WS received SHARED stop"),
+    % logger:warning("WS received SHARED stop"),
     {stop, Reason, State};
 
 handle_info(Msg, #state{nkport=NkPort}=State) ->
@@ -349,7 +349,7 @@ websocket_handle({pong, Body}, Req, ConnPid) ->
     {ok, Req, ConnPid};
 
 websocket_handle(Other, Req, ConnPid) ->
-    lager:warning("WS Handler received unexpected ~p", [Other]),
+    logger:warning("WS Handler received unexpected ~p", [Other]),
     {stop, Req, ConnPid}.
 
 
@@ -384,13 +384,13 @@ websocket_info(nkpacket_stop, Req, State) ->
     {stop, Req, State};
 
 websocket_info(Info, Req, State) ->
-    lager:error("Module ~p received unexpected info ~p", [?MODULE, Info]),
+    logger:error("Module ~p received unexpected info ~p", [?MODULE, Info]),
     {ok, Req, State}.
 
 
 %% @private
 terminate(Reason, _Req, ConnPid) ->
-    lager:debug("WS ~p process terminate: ~p", [self(), Reason]),
+    logger:debug("WS ~p process terminate: ~p", [self(), Reason]),
     nkpacket_connection:stop(ConnPid, normal),
     ok.
 

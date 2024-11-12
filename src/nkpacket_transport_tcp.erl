@@ -69,7 +69,7 @@ connect(NkPort) ->
         undefined -> nkpacket_config_cache:connect_timeout();
         Timeout0 -> Timeout0
     end,
-    lager:debug("TCP connect to: ~p:~p:~p (~p)", [Transp, Ip, Port, SocketOpts]),
+    logger:debug("TCP connect to: ~p:~p:~p (~p)", [Transp, Ip, Port, SocketOpts]),
     case TranspMod:connect(Ip, Port, SocketOpts, ConnTimeout) of
         {ok, Socket} ->
             {ok, {LocalIp, LocalPort}} = InetMod:sockname(Socket),
@@ -219,7 +219,7 @@ terminate(Reason, State) ->
         ranch_pid = RanchPid,
         nkport = #nkport{transp=Transp, socket=Socket} = NkPort
     } = State,
-    lager:debug("TCP/TLS listener stop: ~p", [Reason]),
+    logger:debug("TCP/TLS listener stop: ~p", [Reason]),
     catch call_protocol(listen_stop, [Reason, NkPort], State),
     exit(RanchPid, shutdown),
     timer:sleep(100),   %% Give time to ranch to close acceptors

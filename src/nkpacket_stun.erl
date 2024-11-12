@@ -221,14 +221,14 @@ get_stun_servers([], _Socket, _Local, List) ->
         [ExtIp] ->
             ok;
         [ExtIp|_] = All ->
-            lager:error("STUN multiple external IPs!!: ~p", [All]);
+            logger:error("STUN multiple external IPs!!: ~p", [All]);
         [] ->
             ExtIp = {127,0,0,1},
-            lager:notice("STUN could not find external IP!!")
+            logger:notice("STUN could not find external IP!!")
     end,
     case lists:keymember(port_changed, 2, List) of
         true ->
-            lager:warning("Current NAT is changing ports!");
+            logger:warning("Current NAT is changing ports!");
         false ->
             ok
     end,
@@ -254,10 +254,10 @@ get_stun_servers([Uri|Rest], Socket, Local, Acc) ->
     end,
     case Ips of
         [] ->
-            lager:notice("Skipping STUN ~s", [Host]),
+            logger:notice("Skipping STUN ~s", [Host]),
             get_stun_servers(Rest, Socket, Local, Acc);
         _ ->
-            lager:info("Checking STUN ~s", [Host]),
+            logger:info("Checking STUN ~s", [Host]),
             Acc2 = check_stun_server(Ips, Port, Socket, Local, Acc),
             get_stun_servers(Rest, Socket, Local, Acc2)
     end.
@@ -280,7 +280,7 @@ check_stun_server([Ip|Rest], Port, Socket, LocalPort, Acc) ->
             case decode(Raw) of
                 {response, binding, Id, Data} ->
                     Time = (nklib_util:l_timestamp() - Start) div 1000,
-                    % lager:info("STUN server ~p: ~p msecs", [Ip, Time]),
+                    % logger:info("STUN server ~p: ~p msecs", [Ip, Time]),
                     case proplists:get_value(mapped_address, Data) of
                         {RemoteIp, LocalPort} ->
                             [{RemoteIp, ok, Ip, Port2, Time}|Acc];
